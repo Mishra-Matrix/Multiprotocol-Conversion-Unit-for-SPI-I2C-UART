@@ -1,21 +1,22 @@
 `timescale 1ns / 1ps
-module uart_16x_baud #(
-    parameter CLOCK_FREQ = 1000000,
-    parameter BAUDRATE   = 1250
-)(
+module uart_baud_tick (
     input  wire clk,
-    output reg  clk_16x = 0
+    input  wire rst,
+    output reg  tick_16x
 );
-
-    localparam integer DIVIDER = CLOCK_FREQ / (BAUDRATE * 16);
-    integer counter = 0;
+    localparam integer MAX_COUNT = 10;
+    reg [3:0] counter;
 
     always @(posedge clk) begin
-        if (counter == DIVIDER/2 - 1) begin
-            clk_16x <= ~clk_16x;
+        if (rst) begin
             counter <= 0;
+            tick_16x <= 0;
+        end else if (counter == MAX_COUNT - 1) begin
+            counter <= 0;
+            tick_16x <= 1;
         end else begin
             counter <= counter + 1;
+            tick_16x <= 0;
         end
     end
 endmodule
