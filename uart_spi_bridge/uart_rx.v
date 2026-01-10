@@ -1,69 +1,81 @@
 `timescale 1ns / 1ps
 module uart_rx (
     input  wire clk,
-    input  wire clk_16x,
-    input  wire rdy_clr,
+    input  wire rst,
     input  wire rx,
+    input  wire tick_16x,
+    input  wire rdy_clr,
     output reg  rdy,
-    output reg [7:0] data
+    output reg  [7:0] data
 );
+    localparam IDLE=0, START=1, DATA=2, STOP=3;
 
-    parameter RX_STATE_IDLE  = 2'b00;
-    parameter RX_STATE_START = 2'b01;
-    parameter RX_STATE_DATA  = 2'b10;
-    parameter RX_STATE_STOP  = 2'b11;
-
-    reg [1:0] state = RX_STATE_IDLE;
-    reg [3:0] sample = 0;
-    reg [2:0] bitpos = 0;
-    reg [7:0] scratch = 0;
-    reg clk16_d = 0;
-    wire clk16_tick = (clk_16x & ~clk16_d);
+    reg [1:0] state;
+    reg [3:0] sample_cnt;
+    reg [2:0] bit_idx;
+    reg [7:0] scratch;
+    reg rx_sync1, rx_sync2;
 
     always @(posedge clk) begin
-        clk16_d <= clk_16x;
+        rx_sync1 <= rx;
+        rx_sync2 <= rx_sync1;
+    end
 
-        if (rdy_clr)
+    always @(posedge clk) begin
+        if (rst) begin
+            state <= IDLE;
             rdy <= 0;
+            sample_cnt <= 0;
+            bit_idx <= 0;
+            data <= 0;
+            scratch <= 0;
+        end else begin
+            if (rdy_clr)
+                rdy <= 0;
 
-        if (clk16_tick) begin
-            case (state)
-                RX_STATE_IDLE: begin
-                    if (rx == 1'b0) begin
-                        state <= RX_STATE_START;
-                        sample <= 0;
+            if (tick_16x) begin
+                case (state)
+                    IDLE: begin
+                        if (rx_sync2 == 0) begin
+                            state <= START;
+                            sample_cnt <= 0;
+                        end
                     end
-                end
-                RX_STATE_START: begin
-                    sample <= sample + 1;
-                    if (sample == 4'd7) begin
-                        state <= RX_STATE_DATA;
-                        sample <= 0;
-                        bitpos <= 0;
+
+                    START: begin
+                        if (sample_cnt == 7) begin
+                            state <= DATA;
+                            sample_cnt <= 0;
+                            bit_idx <= 0;
+                        end else
+                            sample_cnt <= sample_cnt + 1;
                     end
-                end
-                RX_STATE_DATA: begin
-                    sample <= sample + 1;
-                    if (sample == 4'd8)
-                        scratch[bitpos] <= rx;
-                    if (sample == 4'd15) begin
-                        sample <= 0;
-                        if (bitpos == 3'd7)
-                            state <= RX_STATE_STOP;
-                        else
-                            bitpos <= bitpos + 1;
+
+                    DATA: begin
+                        if (sample_cnt == 15) begin
+                            sample_cnt <= 0;
+                            scratch[bit_idx] <= rx_sync2;
+                            if (bit_idx == 7)
+                                state <= STOP;
+                            else
+                                bit_idx <= bit_idx + 1;
+                        end else
+                            sample_cnt <= sample_cnt + 1;
                     end
-                end
-                RX_STATE_STOP: begin
-                    sample <= sample + 1;
-                    if (sample == 4'd15) begin
-                        data <= scratch;
-                        rdy <= 1;
-                        state <= RX_STATE_IDLE;
-                        sample <= 0;
+
+                    STOP: begin
+                        if (sample_cnt == 15) begin
+                            if (rx_sync2 == 1) begin
+                                data <= scratch;
+                                rdy <= 1;
+                            end
+                            state <= IDLE;
+                            sample_cnt <= 0;
+                        end else
+                            sample_cnt <= sample_cnt + 1;
                     end
-                end
-            endcase
+                endcase
+            end
         end
     end
 endmodule
