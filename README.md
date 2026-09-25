@@ -2,6 +2,8 @@
 
 This project implements a **Multi-Protocol Conversion Unit** designed to translate serial communications dynamically between common embedded protocols.
 
+<img width="1558" height="1082" alt="Block_Diagram_MPCU" src="https://github.com/user-attachments/assets/c497f9d6-7994-497d-81b0-2f207152cd8c" />
+
 ### Hardware Platform
 - **FPGA Board:** Digilent Arty A7-100T (Xilinx Artix-7 FPGA)
 - **System Clock:** 100 MHz
